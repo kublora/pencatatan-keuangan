@@ -260,7 +260,7 @@ function editTrx(id) {
 async function vMaster() {
   S.master = (await api('getMasterRincian')).rincian;
   $('view').innerHTML = `<div class="d-flex justify-content-between mb-3"><h5 class="mb-0">Master Rincian</h5><button class="btn btn-primary" onclick="masterForm()">+ Tambah Rincian</button></div>
-    <p class="small text-muted">Kode rincian bersifat netral (R001, R002, ...), tanpa jenis pemasukan atau pengeluaran.</p>
+    <p class="small text-muted">Kode rincian bersifat netral (R001, R002, ...)</p>
     ${tbl(['Urutan', 'Kode', 'Nama Rincian', 'Status', 'Aksi'], S.master.map(m => [m.urutan, esc(m.kode_rincian), esc(m.nama_rincian), `<span class="badge bg-${m.status === 'aktif' ? 'primary' : 'secondary'}">${esc(m.status)}</span>`, `<button class="btn btn-sm btn-outline-primary" onclick="masterForm('${esc(m.rincian_id)}')">Edit</button>`]))}`;
 }
 

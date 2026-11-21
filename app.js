@@ -1,4 +1,4 @@
-const GAS_WEB_APP_URL = 'GANTI_DENGAN_URL_WEB_APP_EXEC';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby04e_zEJ8S6vx9ZUfKARLZFadTkCDn3SkV404EqNNe0husRYxjt2-oDPHDLGAkJB0rHw/exec';
 
 const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const S = { token: sessionStorage.getItem('kb_t'), user: JSON.parse(sessionStorage.getItem('kb_u') || 'null'), master: [], desa: [], ex: null };

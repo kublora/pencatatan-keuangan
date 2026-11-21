@@ -1,4 +1,4 @@
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby04e_zEJ8S6vx9ZUfKARLZFadTkCDn3SkV404EqNNe0husRYxjt2-oDPHDLGAkJB0rHw/exec';
+const GAS_WEB_APP_URL = 'GANTI_DENGAN_URL_WEB_APP_EXEC';
 
 const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const S = { token: sessionStorage.getItem('kb_t'), user: JSON.parse(sessionStorage.getItem('kb_u') || 'null'), master: [], desa: [], ex: null };
@@ -7,7 +7,9 @@ const v = id => $(id).value.trim();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const rp = n => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 const N = x => `<span class="d-block text-end">${rp(x)}</span>`;
-const jb = j => `<span class="badge bg-${j === 'Pemasukan' ? 'success' : 'danger'}">${j}</span>`;
+const jb = j => `<span class="badge jn ${j === 'Pemasukan' ? 'jn-in' : 'jn-out'}">${j}</span>`;
+const JABATAN = ['Kepala Desa', 'Sekretaris Desa', 'Bendahara Desa', 'Kaur Keuangan', 'Operator Desa', 'Admin Kabupaten', 'Staf Kabupaten', 'Viewer'];
+const jabSel = cur => sel('uj', 'Jabatan', [...new Set([...(cur && !JABATAN.includes(cur) ? [cur] : []), ...JABATAN])], cur || 'Operator Desa');
 const per = (b, t) => b ? BLN[b - 1] + ' ' + t : 'Tahun ' + t;
 const now = () => ({ b: new Date().getMonth() + 1, t: new Date().getFullYear() });
 const optBln = (s, all) => (all ? '<option value="0">Semua bulan</option>' : '') + BLN.map((b, i) => `<option value="${i + 1}" ${i + 1 == s ? 'selected' : ''}>${b}</option>`).join('');
@@ -102,13 +104,14 @@ function start() {
   $('who').textContent = S.user.nama_lengkap + (S.user.nama_desa ? ' · ' + S.user.nama_desa : '');
   const r = S.user.role;
   const tabs = r === 'operator_desa' ? ['Dashboard', 'Entry'] : r === 'admin_kabupaten' ? ['Dashboard', 'Rekap', 'Master Rincian', 'Manajemen Akun'] : ['Dashboard', 'Rekap'];
-  $('tabs').innerHTML = tabs.map(t => `<li class="nav-item"><a class="nav-link" href="#" data-t="${t}">${t}</a></li>`).join('');
+  const IC = { Dashboard: '📊', Entry: '📝', Rekap: '📑', 'Master Rincian': '🗂️', 'Manajemen Akun': '👥' };
+  $('tabs').innerHTML = tabs.map(t => `<li class="nav-item"><a class="nav-link" href="#" data-t="${t}" title="${t}"><span class="ic">${IC[t]}</span><span class="tx">${t}</span></a></li>`).join('');
   go(tabs[0]);
 }
 $('tabs').onclick = e => { const a = e.target.closest('[data-t]'); if (a) { e.preventDefault(); go(a.dataset.t); } };
 
 function go(t) {
-  clearInterval(S.clk);
+  clearInterval(S.clk); $('ttl').textContent = t; document.body.classList.remove('open');
   document.querySelectorAll('#tabs .nav-link').forEach(a => a.classList.toggle('active', a.dataset.t === t));
   run({ Dashboard: vDash, Entry: vEntry, Rekap: vRekap, 'Master Rincian': vMaster, 'Manajemen Akun': vUsers }[t]);
 }
@@ -278,13 +281,13 @@ async function vUsers() {
 function userForm(id) {
   const u = id ? S.users.find(x => x.user_id === id) : null;
   modal(u ? 'Edit Akun — ' + u.username : 'Tambah Akun',
-    (u ? '' : fld('uu', 'Username *') + fld('up', 'Password awal * (min. 6 karakter)', '', 'password') + sel('ur', 'Role', ['operator_desa', 'viewer'], 'operator_desa')) +
-    fld('un', 'Nama Lengkap *', u ? u.nama_lengkap : '') + fld('uj', 'Jabatan', u ? u.jabatan : '') +
+    fld('uu', 'Username *', u ? u.username : '') + (u ? '<div class="form-text mb-2">Jika username diubah, pengguna harus login dengan username baru.</div>' : fld('up', 'Password awal * (min. 6 karakter)', '', 'password') + sel('ur', 'Role', ['operator_desa', 'viewer'], 'operator_desa')) +
+    fld('un', 'Nama Lengkap *', u ? u.nama_lengkap : '') + jabSel(u ? u.jabatan : '') +
     ((!u || u.role === 'operator_desa') ? fld('ud', 'Nama Desa (wajib untuk operator_desa)', u ? u.nama_desa : '') : '') +
     (u ? sel('us', 'Status', ['aktif', 'nonaktif'], u.status) + (u.role === 'operator_desa' ? '<div class="form-check"><input class="form-check-input" type="checkbox" id="uh"><label class="form-check-label small" for="uh">Ikut ganti nama desa pada riwayat transaksi</label></div>' : '') : ''),
     'Simpan', async () => {
       const p = { mode: u ? 'edit' : 'add', user_id: id, nama_lengkap: v('un'), jabatan: v('uj'), nama_desa: $('ud') ? v('ud') : '' };
-      if (u) { p.status = v('us'); p.rename_riwayat = !!($('uh') && $('uh').checked); } else { p.username = v('uu'); p.password = $('up').value; p.role = v('ur'); }
+      p.username = v('uu'); if (u) { p.status = v('us'); p.rename_riwayat = !!($('uh') && $('uh').checked); } else { p.password = $('up').value; p.role = v('ur'); }
       await api('saveUser', p); toast('Akun tersimpan'); run(vUsers);
     });
 }
@@ -310,7 +313,7 @@ function exportPdf() {
   d.setFontSize(11); d.text(e.title.toUpperCase(), W / 2, 20, { align: 'center' });
   d.setFont('helvetica', 'normal'); d.setFontSize(10); d.text('Periode: ' + e.sub, W / 2, 26, { align: 'center' });
   d.setLineWidth(.6); d.line(14, 29, W - 14, 29);
-  d.autoTable({ startY: 33, head: [e.head], body: e.body.map(f), foot: e.foot.map(f), styles: { fontSize: 8.5 }, headStyles: { fillColor: [13, 110, 253] }, footStyles: { fillColor: [230, 230, 230], textColor: 0 }, columnStyles: cs });
+  d.autoTable({ startY: 33, head: [e.head], body: e.body.map(f), foot: e.foot.map(f), styles: { fontSize: 8.5 }, headStyles: { fillColor: [21, 83, 50] }, footStyles: { fillColor: [230, 230, 230], textColor: 0 }, columnStyles: cs });
   let y = d.lastAutoTable.finalY + 12; const x = W - 75;
   if (y > d.internal.pageSize.getHeight() - 60) { d.addPage(); y = 20; }
   d.setFontSize(10); d.text('Blora, ' + new Date().toLocaleDateString('id-ID', { dateStyle: 'long' }), x, y);
@@ -322,5 +325,8 @@ function exportPdf() {
   }
   d.save(e.fn + '.pdf');
 }
+
+$('burger').onclick = () => document.body.classList.toggle(innerWidth < 992 ? 'open' : 'collapsed');
+$('scrim').onclick = () => document.body.classList.remove('open');
 
 start();

@@ -1,9 +1,53 @@
-body { background: #f4f6fa; }
+:root {
+  --dark-green: #06362D; --cal-poly-green: #155332; --vanilla: #DEE2B1; --gold: #FFD500; --goldenrod: #D1A505;
+  --bs-primary: #155332; --bs-primary-rgb: 21, 83, 50; --bs-link-color: #155332; --bs-link-hover-color: #06362D;
+  --side-w: 250px; --side-w-c: 68px;
+}
+body { background: #f5f6e8; color: #1d2b24; }
+.btn-primary { --bs-btn-bg: #155332; --bs-btn-border-color: #155332; --bs-btn-hover-bg: #06362D; --bs-btn-hover-border-color: #06362D; --bs-btn-active-bg: #06362D; --bs-btn-active-border-color: #06362D; --bs-btn-disabled-bg: #155332; --bs-btn-disabled-border-color: #155332; }
+.btn-outline-primary { --bs-btn-color: #155332; --bs-btn-border-color: #155332; --bs-btn-hover-bg: #155332; --bs-btn-hover-border-color: #155332; --bs-btn-active-bg: #155332; --bs-btn-active-border-color: #155332; }
+.table-light { --bs-table-bg: #eef0cf; --bs-table-color: #06362D; }
+.card { border-radius: 10px; }
+
 .spin { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 3000; display: flex; align-items: center; justify-content: center; }
 #toasts { position: fixed; top: 12px; right: 12px; left: 12px; max-width: 420px; margin-left: auto; z-index: 2500; }
-#login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.login-card { width: 100%; max-width: 380px; }
-#tabs .nav-link { white-space: nowrap; }
+#login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: linear-gradient(135deg, #06362D, #155332); }
+.login-card { width: 100%; max-width: 380px; border-top: 4px solid var(--gold); }
+.brand-title { color: var(--cal-poly-green); }
+
+/* Sidebar collapsible */
+#app { display: flex; min-height: 100vh; }
+#side { width: var(--side-w); flex-shrink: 0; background: var(--dark-green); color: #fff; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: width .2s; }
+#content { flex: 1; min-width: 0; }
+.side-head { display: flex; align-items: center; gap: .75rem; padding: 1rem; border-bottom: 1px solid rgba(222, 226, 177, .2); }
+.logo { background: var(--gold); color: var(--dark-green); font-weight: 800; border-radius: 8px; min-width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+.brand-name { font-weight: 700; color: var(--vanilla); white-space: nowrap; }
+#tabs { padding: .75rem 0; flex: 1; overflow-y: auto; }
+#tabs .nav-link { color: var(--vanilla); display: flex; align-items: center; gap: .75rem; margin: 2px 8px; padding: .6rem .75rem; border-radius: 8px; white-space: nowrap; }
+#tabs .nav-link:hover { background: var(--cal-poly-green); color: #fff; }
+#tabs .nav-link.active { background: var(--gold); color: var(--dark-green); font-weight: 600; }
+#tabs .ic { width: 22px; text-align: center; flex-shrink: 0; }
+.side-foot { padding: .75rem; border-top: 1px solid rgba(222, 226, 177, .2); font-size: .8rem; color: var(--vanilla); }
+#who { white-space: normal; word-break: break-word; }
+.topbar { background: #fff; border-bottom: 3px solid var(--gold); padding: .5rem .75rem; display: flex; align-items: center; gap: .75rem; position: sticky; top: 0; z-index: 10; }
+#scrim { display: none; }
+@media (min-width: 992px) {
+  body.collapsed #side { width: var(--side-w-c); }
+  body.collapsed .tx { display: none; }
+  body.collapsed #tabs .nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
+  body.collapsed .side-head { justify-content: center; padding: 1rem 0; }
+}
+@media (max-width: 991.98px) {
+  #side { position: fixed; left: 0; top: 0; z-index: 1040; transform: translateX(-100%); transition: transform .2s; }
+  body.open #side { transform: none; }
+  body.open #scrim { display: block; position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 1035; }
+}
+
+/* Badge jenis: warna light sesuai tema */
+.badge.jn { font-weight: 600; border: 1px solid rgba(0, 0, 0, .08); }
+.badge.jn-in { background: #d4e8d0; color: #155332; }
+.badge.jn-out { background: #fff0a6; color: #7a5c00; }
+
 .table th, .table td { white-space: nowrap; }
 .sig { border: 1px dashed #888; border-radius: 6px; background: #fff; width: 100%; max-width: 300px; height: 120px; touch-action: none; }
 .badge[title] { cursor: pointer; }

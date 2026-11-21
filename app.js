@@ -30,8 +30,10 @@ const spin = d => { busy += d; $('spin').classList.toggle('d-none', busy <= 0); 
 async function api(action, payload = {}) {
   spin(1);
   try {
+    if (GAS_WEB_APP_URL.indexOf('/exec') < 0) throw new Error('GAS_WEB_APP_URL di app.js belum diisi dengan URL Web App (berakhiran /exec).');
     const r = await fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action, token: S.token, payload }) });
-    const j = await r.json();
+    const txt = await r.text(); let j;
+    try { j = JSON.parse(txt); } catch (x) { throw new Error('Server mengembalikan halaman HTML, bukan JSON. Periksa URL /exec dan akses Web App (harus Anyone).'); }
     if (!j.ok) {
       if (['SESSION_EXPIRED', 'UNAUTHENTICATED'].includes(j.code) && action !== 'login') logout(true);
       throw new Error(j.message);

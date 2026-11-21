@@ -12,9 +12,9 @@
 <div id="toasts"></div>
 
 <section id="login" class="d-none">
-  <form id="loginForm" class="card shadow-sm login-card">
+  <form id="loginForm" class="card shadow login-card">
     <div class="card-body p-4">
-      <h4 class="fw-bold text-primary mb-1">KU Blora</h4>
+      <h4 class="fw-bold brand-title mb-1">KU Blora</h4>
       <p class="text-muted small mb-3">Pencatatan &amp; rekapitulasi keuangan bulanan desa</p>
       <input id="lu" class="form-control mb-2" placeholder="Username" autocomplete="username" required>
       <input id="lp" type="password" class="form-control mb-2" placeholder="Password" autocomplete="current-password" required>
@@ -25,15 +25,19 @@
 </section>
 
 <div id="app" class="d-none">
-  <nav class="navbar navbar-dark bg-primary px-3">
-    <span class="navbar-brand fw-bold mb-0">KU Blora</span>
-    <span class="d-flex align-items-center gap-2 text-white small">
-      <span id="who" class="text-truncate"></span>
-      <button id="logoutBtn" class="btn btn-sm btn-light">Keluar</button>
-    </span>
-  </nav>
-  <ul id="tabs" class="nav nav-pills gap-1 px-3 py-2 bg-white border-bottom flex-nowrap overflow-auto"></ul>
-  <main id="view" class="container-fluid py-3"></main>
+  <aside id="side">
+    <div class="side-head"><span class="logo">KB</span><span class="tx brand-name">KU Blora</span></div>
+    <ul id="tabs" class="nav flex-column"></ul>
+    <div class="side-foot">
+      <div id="who" class="tx mb-2"></div>
+      <button id="logoutBtn" class="btn btn-sm btn-outline-warning w-100">⎋<span class="tx"> Keluar</span></button>
+    </div>
+  </aside>
+  <div id="scrim"></div>
+  <div id="content">
+    <header class="topbar"><button id="burger" class="btn btn-sm btn-outline-primary" aria-label="Menu">☰</button><span id="ttl" class="fw-semibold"></span></header>
+    <main id="view" class="container-fluid py-3"></main>
+  </div>
 </div>
 
 <div class="modal fade" id="modal" tabindex="-1">

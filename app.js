@@ -1,13 +1,13 @@
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyPPCAbmNfaP9fmfRtWSyfkOpz3y-bVgxn0qB64IKzFQ8fnmXS-mWFqncTLabN46rTJxw/exec';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzKPh0pIV4UJWxprIlP0pCaKspohi7oooCGGA1HnQskfjkFAFgiD022WhplwLMIoROWxQ/exec';
 
 const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const WILAYAH = ['Utara', 'Selatan', 'Timur', 'Barat1', 'Barat2', 'Barat3'];
 const S = { token: sessionStorage.getItem('kb_t'), user: JSON.parse(sessionStorage.getItem('kb_u') || 'null'), master: [], desa: [], ex: null };
 const $ = id => document.getElementById(id);
 const v = id => $(id).value.trim();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const rp = n => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 const N = x => `<span class="d-block text-end">${rp(x)}</span>`;
-const jb = j => `<span class="badge jn ${j === 'Pemasukan' ? 'jn-in' : 'jn-out'}">${j}</span>`;
 const JABATAN = ['Kepala Desa', 'Sekretaris Desa', 'Bendahara Desa', 'Kaur Keuangan', 'Operator Desa', 'Admin Kabupaten', 'Staf Kabupaten', 'Viewer'];
 const jabSel = cur => sel('uj', 'Jabatan', [...new Set([...(cur && !JABATAN.includes(cur) ? [cur] : []), ...JABATAN])], cur || 'Operator Desa');
 const per = (b, t) => b ? BLN[b - 1] + ' ' + t : 'Tahun ' + t;
@@ -17,7 +17,7 @@ const optThn = s => { const y = new Date().getFullYear(); let o = ''; for (let i
 const fld = (id, l, val = '', type = 'text') => `<div class="mb-2"><label class="form-label small mb-1">${l}</label><input id="${id}" type="${type}" class="form-control" value="${esc(val)}"></div>`;
 const sel = (id, l, opts, cur) => `<div class="mb-2"><label class="form-label small mb-1">${l}</label><select id="${id}" class="form-select">${opts.map(o => `<option ${o == cur ? 'selected' : ''}>${o}</option>`).join('')}</select></div>`;
 const tbl = (h, r, foot = '') => `<div class="table-responsive"><table class="table table-sm table-striped align-middle bg-white"><thead class="table-light"><tr>${h.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${r.length ? r.map(x => `<tr>${x.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${h.length}" class="text-center text-muted py-3">Belum ada data</td></tr>`}</tbody>${foot}</table></div>`;
-const cards = d => `<div class="row g-3 mb-3">${[['Total Pemasukan', d.total_pemasukan, 'success'], ['Total Pengeluaran', d.total_pengeluaran, 'danger'], ['Saldo', d.saldo, d.saldo < 0 ? 'danger' : 'primary']].map(([l, x, c]) => `<div class="col-md-4"><div class="card border-${c}"><div class="card-body py-2"><div class="text-muted small">${l}</div><div class="fs-4 fw-bold text-${c}">${rp(x)}</div></div></div></div>`).join('')}</div>`;
+const cards = d => `<div class="row g-3 mb-3"><div class="col-md-6"><div class="card border-primary"><div class="card-body py-3"><div class="text-muted small">Total Nominal</div><div class="fs-4 fw-bold text-primary">${rp(d.total)}</div></div></div></div><div class="col-md-6"><div class="card"><div class="card-body py-3"><div class="text-muted small">Jumlah Rincian Terisi</div><div class="fs-4 fw-bold">${Number(d.jumlah_transaksi || 0).toLocaleString('id-ID')}</div></div></div></div></div>`;
 const badge = t => t.diedit ? `<span class="badge bg-warning text-dark" title="${esc(t.edit_message)} — ${esc(t.edited_by)}, ${esc(t.edited_at)}" onclick="alert(this.title)">Diedit Admin</span>` : '';
 const exBtns = '<button class="btn btn-outline-danger" onclick="exportPdf()">Unduh PDF</button><button class="btn btn-outline-success" onclick="exportXls()">Export Excel</button>';
 const run = f => f().catch(e => toast(e.message, 'danger'));
@@ -123,15 +123,15 @@ async function vDash() {
   const op = S.user.role === 'operator_desa', n = now(), f = S.df || (S.df = { b: n.b, t: n.t, r: '', d: '' });
   if (!op && !S.master.length) S.master = (await api('getMasterRincian')).rincian;
   const d = await api('getDashboard', { bulan: f.b, tahun: f.t, rincian_id: f.r, nama_desa: f.d });
-  if (!op && !f.d) S.desa = [...new Set([...S.desa, ...d.per_desa.map(x => x.nama_desa)])].sort();
+  if (!op) S.desa = [...WILAYAH];
   $('view').innerHTML = `<div class="row g-2 mb-3">
     <div class="col-6 col-md-2"><select id="fb" class="form-select">${optBln(f.b, 1)}</select></div>
     <div class="col-6 col-md-2"><select id="ft" class="form-select">${optThn(f.t)}</select></div>
-    ${op ? '' : `<div class="col-6 col-md-4"><select id="fr" class="form-select"><option value="">Semua rincian</option>${S.master.map(m => `<option value="${m.rincian_id}" ${m.rincian_id == f.r ? 'selected' : ''}>${esc(m.nama_rincian)}</option>`).join('')}</select></div>
-    <div class="col-6 col-md-4"><select id="fd" class="form-select"><option value="">Semua desa</option>${S.desa.map(x => `<option ${x == f.d ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>`}
+    ${op ? '' : `<div class="col-6 col-md-4"><select id="fr" class="form-select"><option value="">Semua rincian</option>${S.master.map(m => `<option value="${esc(m.rincian_id)}" ${m.rincian_id == f.r ? 'selected' : ''}>${esc(m.nama_rincian)}</option>`).join('')}</select></div>
+    <div class="col-6 col-md-4"><select id="fd" class="form-select"><option value="">Semua wilayah</option>${S.desa.map(x => `<option ${x == f.d ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>`}
   </div>${cards(d)}
-  <div class="row g-3"><div class="col-lg-${op ? 12 : 6}"><h6>Per Rincian</h6>${tbl(['Rincian', 'Jenis', 'Total'], d.per_rincian.map(r => [esc(r.nama_rincian), jb(r.jenis), N(r.total)]))}</div>
-  ${op ? '' : `<div class="col-lg-6"><h6>Per Desa <small class="text-muted">(${d.jumlah_desa_melapor} desa melapor)</small></h6>${tbl(['Desa', 'Pemasukan', 'Pengeluaran', 'Saldo'], d.per_desa.map(x => [esc(x.nama_desa), N(x.pemasukan), N(x.pengeluaran), N(x.saldo)]))}</div>`}</div>`;
+  <div class="row g-3"><div class="col-lg-${op ? 12 : 6}"><h6>Per Rincian</h6>${tbl(['Rincian', 'Total Nominal'], d.per_rincian.map(r => [esc(r.nama_rincian), N(r.total)]))}</div>
+  ${op ? '' : `<div class="col-lg-6"><h6>Per Wilayah <small class="text-muted">(${d.jumlah_wilayah_melapor} dari 6 operator melapor)</small></h6>${tbl(['Wilayah', 'Total Nominal'], d.per_desa.map(x => [esc(x.nama_desa), N(x.total)]))}</div>`}</div>`;
   bind(['fb', 'ft', 'fr', 'fd'], () => { f.b = +$('fb').value; f.t = +$('ft').value; if ($('fr')) f.r = $('fr').value; if ($('fd')) f.d = $('fd').value; run(vDash); });
 }
 
@@ -140,16 +140,16 @@ async function vEntry() {
   const n = now(), f = S.ef || (S.ef = { b: n.b, t: n.t });
   const d = await api('getEntryList', { bulan: f.b, tahun: f.t });
   S.ex = {
-    title: 'Laporan Keuangan ' + S.user.nama_desa, sub: per(f.b, f.t), head: ['Periode', 'Rincian', 'Jenis', 'Nominal'],
-    body: d.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, t.nama_rincian, t.jenis, t.nominal]),
-    foot: [['', '', 'Total Pemasukan', d.total_pemasukan], ['', '', 'Total Pengeluaran', d.total_pengeluaran], ['', '', 'Saldo', d.saldo]],
+    title: 'Laporan Keuangan Wilayah ' + S.user.nama_desa, sub: per(f.b, f.t), head: ['Periode', 'Rincian', 'Nominal'],
+    body: d.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, t.nama_rincian, t.nominal]),
+    foot: [['', 'Grand Total', d.total]],
     signer: d.penandatangan, fn: `Laporan_${S.user.nama_desa}_${f.t}-${f.b}`
   };
   $('view').innerHTML = `<div class="row g-2 mb-3">
     <div class="col-6 col-md-2"><select id="fb" class="form-select">${optBln(f.b, 1)}</select></div>
     <div class="col-6 col-md-2"><select id="ft" class="form-select">${optThn(f.t)}</select></div>
     <div class="col-md-8 d-flex flex-wrap gap-2 justify-content-md-end"><button class="btn btn-primary" onclick="S.fm=null;run(entryForm)">+ Tambah Transaksi</button>${exBtns}</div></div>
-    ${cards(d)}${tbl(['Periode', 'Rincian', 'Jenis', 'Nominal'], d.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(t.nama_rincian) + ' ' + badge(t), jb(t.jenis), N(t.nominal)]))}`;
+    ${cards(d)}${tbl(['Periode', 'Rincian', 'Nominal'], d.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal)]))}`;
   bind(['fb', 'ft'], () => { f.b = +$('fb').value; f.t = +$('ft').value; run(vEntry); });
 }
 
@@ -171,16 +171,16 @@ async function entryForm() {
   const [mm, d] = await Promise.all([api('getMasterRincian'), api('getEntryList', { bulan: f.b, tahun: f.t })]);
   const ex = d.sudah_lapor, sg = d.penandatangan;
   // Jika periode sudah ada isinya: tampilkan data yang tersimpan (read-only)
-  const items = ex ? d.transaksi.map(t => ({ id: t.rincian_id, n: t.nama_rincian, j: t.jenis, v: t.nominal })) : mm.rincian.map(m => ({ id: m.rincian_id, n: m.nama_rincian, j: m.jenis, v: '' }));
+  const items = ex ? d.transaksi.map(t => ({ id: t.rincian_id, n: t.nama_rincian, v: t.nominal })) : mm.rincian.filter(m => m.status === 'aktif').map(m => ({ id: m.rincian_id, n: m.nama_rincian, v: '' }));
   $('view').innerHTML = `<div class="card"><div class="card-body">
-    <h5 class="mb-3">Form Input Transaksi — ${esc(S.user.nama_desa)}</h5>
+    <h5 class="mb-3">Form Input Transaksi — Wilayah ${esc(S.user.nama_desa)}</h5>
     <div class="row g-2 mb-3">
       <div class="col-6 col-md-3"><label class="form-label small mb-1">Bulan</label><select id="pb" class="form-select">${optBln(f.b)}</select></div>
       <div class="col-6 col-md-3"><label class="form-label small mb-1">Tahun</label><select id="pt" class="form-select">${optThn(f.t)}</select></div>
       <div class="col-md-6"><label class="form-label small mb-1">Tanggal &amp; Waktu Input</label><div id="clk" class="fw-semibold pt-1"></div></div>
     </div>
     ${ex ? `<div class="alert alert-info">Laporan <b>${per(f.b, f.t)}</b> sudah pernah diinput${sg ? ' pada ' + esc(sg.timestamp_input) : ''}. Data di bawah hanya untuk dilihat. Untuk koreksi, hubungi Admin Kabupaten.</div>` : ''}
-    ${items.map(i => `<div class="row g-2 align-items-center border-bottom py-2"><div class="col-7">${esc(i.n)} ${jb(i.j)}</div>
+    ${items.map(i => `<div class="row g-2 align-items-center border-bottom py-2"><div class="col-7">${esc(i.n)}</div>
       <div class="col-5"><input class="form-control text-end money" inputmode="numeric" data-id="${i.id}" placeholder="–" value="${i.v === '' ? '' : Number(i.v).toLocaleString('id-ID')}" ${ex ? 'disabled' : ''}></div></div>`).join('') || '<div class="text-muted">Belum ada rincian aktif. Hubungi Admin Kabupaten.</div>'}
     ${ex ? `<p class="mt-3 mb-0 small">Penandatangan: <b>${esc(sg && sg.nama)}</b> (${esc(sg && sg.jabatan)})</p>` : `
     <h6 class="mt-4">Penandatangan</h6>
@@ -213,30 +213,29 @@ async function vRekap() {
   let mx = null;
   if (f.m === 'mx' || !S.desa.length) { mx = await api('getRekapMatriks', { bulan: f.b, tahun: f.t }); S.desa = mx.desa; }
   if (!S.desa.includes(f.d)) f.d = S.desa[0] || '';
-  let inner = '<div class="text-muted">Belum ada desa.</div>';
+  let inner = '<div class="text-muted">Belum ada wilayah.</div>';
   if (f.m === 'mx') {
-    const D = mx.desa, R = mx.ringkasan, fr = (l, o) => [l, ...D.map(x => o.per_desa[x]), o.total];
-    const foot = [fr('Total Pemasukan', R.total_pemasukan), fr('Total Pengeluaran', R.total_pengeluaran), fr('Grand Total (Saldo)', R.saldo)];
+    const D = mx.desa, R = mx.ringkasan;
+    const grand = ['Grand Total', ...D.map(x => R.per_desa[x] || 0), R.total];
     const head = ['Nama Rincian', ...D, 'Total'];
-    S.ex = { title: 'Rekap Keuangan Seluruh Desa', sub: per(f.b, f.t), head, body: mx.rows.map(r => [r.nama_rincian, ...D.map(x => r.values[x]), r.total]), foot, signer: { nama: S.user.nama_lengkap, jabatan: S.user.jabatan, ttd_data: '' }, fn: `Rekap_${f.t}-${f.b}` };
-    inner = tbl(head.map(esc), mx.rows.map(r => [esc(r.nama_rincian) + ` <small class="text-muted">(${r.jenis})</small>`, ...D.map(x => N(r.values[x])), N(r.total)]),
-      `<tfoot class="fw-bold">${foot.map(r => `<tr>${r.map((c, i) => `<td>${i ? N(c) : c}</td>`).join('')}</tr>`).join('')}</tfoot>`);
+    S.ex = { title: 'Rekap Keuangan Seluruh Wilayah', sub: per(f.b, f.t), head, body: mx.rows.map(r => [r.nama_rincian, ...D.map(x => r.values[x] || 0), r.total]), foot: [grand], signer: { nama: S.user.nama_lengkap, jabatan: S.user.jabatan, ttd_data: '' }, fn: `Rekap_${f.t}-${f.b}` };
+    inner = tbl(head.map(esc), mx.rows.map(r => [esc(r.nama_rincian), ...D.map(x => N(r.values[x] || 0)), N(r.total)]),
+      `<tfoot class="fw-bold"><tr>${grand.map((c, i) => `<td>${i ? N(c) : c}</td>`).join('')}</tr></tfoot>`);
   } else if (f.d) {
     const p = await api('getRekapPerDesa', { nama_desa: f.d, bulan: f.b, tahun: f.t });
     S.pd = p.transaksi;
     S.ex = {
-      title: 'Laporan Keuangan ' + f.d, sub: per(f.b, f.t), head: ['Periode', 'Rincian', 'Jenis', 'Nominal', 'Waktu Input'],
-      body: p.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, t.nama_rincian, t.jenis, t.nominal, t.timestamp_input]),
-      foot: [['', '', 'Total Pemasukan', p.total_pemasukan, ''], ['', '', 'Total Pengeluaran', p.total_pengeluaran, ''], ['', '', 'Saldo', p.saldo, '']], signer: p.penandatangan, fn: `Laporan_${f.d}_${f.t}-${f.b}`
+      title: 'Laporan Keuangan Wilayah ' + f.d, sub: per(f.b, f.t), head: ['Periode', 'Rincian', 'Nominal', 'Waktu Input'],
+      body: p.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, t.nama_rincian, t.nominal, t.timestamp_input]),
+      foot: [['', 'Grand Total', p.total, '']], signer: p.penandatangan, fn: `Laporan_${f.d}_${f.t}-${f.b}`
     };
-    const sp = adm ? 2 : 1;
-    inner = tbl(['Periode', 'Rincian', 'Jenis', 'Nominal', 'Waktu Input', ...(adm ? ['Aksi'] : [])],
-      p.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(t.nama_rincian) + ' ' + badge(t), jb(t.jenis), N(t.nominal), `<small>${esc(t.timestamp_input)}</small>`,
-        ...(adm ? [`<button class="btn btn-sm btn-outline-primary" onclick="editTrx('${t.trx_id}')">Edit</button>`] : [])]),
-      `<tfoot class="fw-bold">${[['Total Pemasukan', p.total_pemasukan], ['Total Pengeluaran', p.total_pengeluaran], ['Saldo', p.saldo]].map(([l, x]) => `<tr><td colspan="3" class="text-end">${l}</td><td>${N(x)}</td><td colspan="${sp}"></td></tr>`).join('')}</tfoot>`);
+    inner = tbl(['Periode', 'Rincian', 'Nominal', 'Waktu Input', ...(adm ? ['Aksi'] : [])],
+      p.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal), `<small>${esc(t.timestamp_input)}</small>`,
+        ...(adm ? [`<button class="btn btn-sm btn-outline-primary" onclick="editTrx('${esc(t.trx_id)}')">Edit</button>`] : [])]),
+      `<tfoot class="fw-bold"><tr><td colspan="2" class="text-end">Grand Total</td><td>${N(p.total)}</td><td colspan="${adm ? 2 : 1}"></td></tr></tfoot>`);
   }
   $('view').innerHTML = `<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-    <div class="btn-group"><button class="btn btn-${f.m === 'mx' ? 'primary' : 'outline-primary'}" onclick="S.rf.m='mx';run(vRekap)">Matriks Gabungan</button><button class="btn btn-${f.m === 'ds' ? 'primary' : 'outline-primary'}" onclick="S.rf.m='ds';run(vRekap)">Per Desa</button></div>
+    <div class="btn-group"><button class="btn btn-${f.m === 'mx' ? 'primary' : 'outline-primary'}" onclick="S.rf.m='mx';run(vRekap)">Matriks Gabungan</button><button class="btn btn-${f.m === 'ds' ? 'primary' : 'outline-primary'}" onclick="S.rf.m='ds';run(vRekap)">Per Wilayah</button></div>
     <select id="fb" class="form-select w-auto">${optBln(f.b, 1)}</select><select id="ft" class="form-select w-auto">${optThn(f.t)}</select>
     ${f.m === 'ds' ? `<select id="fd" class="form-select w-auto">${S.desa.map(x => `<option ${x == f.d ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>` : ''}
     <span class="ms-auto d-flex gap-2">${exBtns}</span></div>${inner}`;
@@ -245,11 +244,13 @@ async function vRekap() {
 
 function editTrx(id) {
   const t = S.pd.find(x => x.trx_id === id);
+  if (!t) return toast('Transaksi tidak ditemukan', 'danger');
   modal('Edit Transaksi — ' + t.nama_desa,
-    `<div class="mb-2"><label class="form-label small mb-1">Rincian</label><select id="er" class="form-select">${S.master.filter(m => m.status === 'aktif' || m.rincian_id === t.rincian_id).map(m => `<option value="${m.rincian_id}" ${m.rincian_id === t.rincian_id ? 'selected' : ''}>${esc(m.nama_rincian)} (${m.jenis})</option>`).join('')}</select></div>
-     <div class="mb-2"><label class="form-label small mb-1">Nominal</label><input id="en" class="form-control money text-end" inputmode="numeric" value="${t.nominal.toLocaleString('id-ID')}"></div>
+    `<div class="mb-2"><label class="form-label small mb-1">Rincian</label><select id="er" class="form-select">${S.master.filter(m => m.status === 'aktif' || m.rincian_id === t.rincian_id).map(m => `<option value="${esc(m.rincian_id)}" ${m.rincian_id === t.rincian_id ? 'selected' : ''}>${esc(m.nama_rincian)}</option>`).join('')}</select></div>
+     <div class="mb-2"><label class="form-label small mb-1">Nominal</label><input id="en" class="form-control money text-end" inputmode="numeric" value="${Number(t.nominal).toLocaleString('id-ID')}"></div>
      <div class="mb-2"><label class="form-label small mb-1">Pesan Edit / Alasan Perubahan <span class="text-danger">*</span></label><textarea id="em" class="form-control" rows="2" placeholder="Contoh: Koreksi salah ketik nol sesuai bukti kuitansi"></textarea></div>`,
     'Simpan Perubahan', async () => {
+      if (!v('em')) throw new Error('Alasan perubahan wajib diisi.');
       await api('updateTransaksiAdmin', { trx_id: id, rincian_id: v('er'), nominal: v('en').replace(/\D/g, ''), edit_message: v('em') });
       toast('Perubahan tersimpan'); run(vRekap);
     });
@@ -259,15 +260,16 @@ function editTrx(id) {
 async function vMaster() {
   S.master = (await api('getMasterRincian')).rincian;
   $('view').innerHTML = `<div class="d-flex justify-content-between mb-3"><h5 class="mb-0">Master Rincian</h5><button class="btn btn-primary" onclick="masterForm()">+ Tambah Rincian</button></div>
-    ${tbl(['Urutan', 'Kode', 'Nama Rincian', 'Jenis', 'Status', 'Aksi'], S.master.map(m => [m.urutan, esc(m.kode_rincian), esc(m.nama_rincian), jb(m.jenis), `<span class="badge bg-${m.status === 'aktif' ? 'primary' : 'secondary'}">${m.status}</span>`, `<button class="btn btn-sm btn-outline-primary" onclick="masterForm('${m.rincian_id}')">Edit</button>`]))}`;
+    <p class="small text-muted">Kode rincian bersifat netral (R001, R002, ...), tanpa jenis pemasukan atau pengeluaran.</p>
+    ${tbl(['Urutan', 'Kode', 'Nama Rincian', 'Status', 'Aksi'], S.master.map(m => [m.urutan, esc(m.kode_rincian), esc(m.nama_rincian), `<span class="badge bg-${m.status === 'aktif' ? 'primary' : 'secondary'}">${esc(m.status)}</span>`, `<button class="btn btn-sm btn-outline-primary" onclick="masterForm('${esc(m.rincian_id)}')">Edit</button>`]))}`;
 }
 
 function masterForm(id) {
-  const m = S.master.find(x => x.rincian_id === id) || { urutan: '', kode_rincian: '', nama_rincian: '', jenis: 'Pemasukan', status: 'aktif' };
+  const m = S.master.find(x => x.rincian_id === id) || { urutan: '', kode_rincian: '', nama_rincian: '', status: 'aktif' };
   modal(id ? 'Edit Rincian' : 'Tambah Rincian',
-    fld('mu', 'Urutan (kosongkan = paling akhir)', m.urutan, 'number') + fld('mk', 'Kode (kosongkan = otomatis)', m.kode_rincian) + fld('mn', 'Nama Rincian *', m.nama_rincian) + sel('mj', 'Jenis', ['Pemasukan', 'Pengeluaran'], m.jenis) + sel('ms', 'Status', ['aktif', 'nonaktif'], m.status),
+    fld('mu', 'Urutan (kosongkan = paling akhir)', m.urutan, 'number') + fld('mk', 'Kode (kosongkan = otomatis, contoh R001)', m.kode_rincian) + fld('mn', 'Nama Rincian *', m.nama_rincian) + sel('ms', 'Status', ['aktif', 'nonaktif'], m.status),
     'Simpan', async () => {
-      await api('saveMasterRincian', { mode: id ? 'edit' : 'add', rincian_id: id, urutan: v('mu'), kode_rincian: v('mk'), nama_rincian: v('mn'), jenis: v('mj'), status: v('ms') });
+      await api('saveMasterRincian', { mode: id ? 'edit' : 'add', rincian_id: id, urutan: v('mu'), kode_rincian: v('mk'), nama_rincian: v('mn'), status: v('ms') });
       toast('Rincian tersimpan'); run(vMaster);
     });
 }
@@ -275,42 +277,49 @@ function masterForm(id) {
 // ---------- 5. Manajemen Akun (Admin) ----------
 async function vUsers() {
   S.users = (await api('getUsers')).users;
-  $('view').innerHTML = `<div class="d-flex justify-content-between mb-3"><h5 class="mb-0">Manajemen Akun</h5><button class="btn btn-primary" onclick="userForm()">+ Tambah Akun</button></div>
-    ${tbl(['Username', 'Nama Lengkap', 'Jabatan', 'Desa', 'Role', 'Status', 'Aksi'], S.users.map(u => [esc(u.username), esc(u.nama_lengkap), esc(u.jabatan), esc(u.nama_desa), u.role, `<span class="badge bg-${u.status === 'aktif' ? 'primary' : 'secondary'}">${u.status}</span>`,
-      `<button class="btn btn-sm btn-outline-primary" onclick="userForm('${u.user_id}')">Edit</button> <button class="btn btn-sm btn-outline-warning" onclick="resetPw('${u.user_id}')">Reset Password</button>`]))}`;
+  $('view').innerHTML = `<div class="d-flex justify-content-between mb-3"><h5 class="mb-0">Manajemen Akun</h5><button class="btn btn-primary" onclick="userForm()">+ Tambah Viewer</button></div>
+    <p class="small text-muted">Operator tetap: ${WILAYAH.join(', ')}. Admin dapat mengubah nama, jabatan, status, dan mereset kata sandi.</p>
+    ${tbl(['Username', 'Nama Lengkap', 'Jabatan', 'Wilayah', 'Role', 'Status', 'Aksi'], S.users.map(u => [esc(u.username), esc(u.nama_lengkap), esc(u.jabatan), esc(u.nama_desa), esc(u.role), `<span class="badge bg-${u.status === 'aktif' ? 'primary' : 'secondary'}">${esc(u.status)}</span>`,
+      `<button class="btn btn-sm btn-outline-primary" onclick="userForm('${esc(u.user_id)}')">Edit</button> <button class="btn btn-sm btn-outline-warning" onclick="resetPw('${esc(u.user_id)}')">Reset Password</button>`]))}`;
 }
 
 function userForm(id) {
   const u = id ? S.users.find(x => x.user_id === id) : null;
-  modal(u ? 'Edit Akun — ' + u.username : 'Tambah Akun',
-    fld('uu', 'Username *', u ? u.username : '') + (u ? '<div class="form-text mb-2">Jika username diubah, pengguna harus login dengan username baru.</div>' : fld('up', 'Password awal * (min. 6 karakter)', '', 'password') + sel('ur', 'Role', ['operator_desa', 'viewer'], 'operator_desa')) +
-    fld('un', 'Nama Lengkap *', u ? u.nama_lengkap : '') + jabSel(u ? u.jabatan : '') +
-    ((!u || u.role === 'operator_desa') ? fld('ud', 'Nama Desa (wajib untuk operator_desa)', u ? u.nama_desa : '') : '') +
-    (u ? sel('us', 'Status', ['aktif', 'nonaktif'], u.status) + (u.role === 'operator_desa' ? '<div class="form-check"><input class="form-check-input" type="checkbox" id="uh"><label class="form-check-label small" for="uh">Ikut ganti nama desa pada riwayat transaksi</label></div>' : '') : ''),
+  const fixed = !!(u && u.role === 'operator_desa');
+  modal(u ? 'Edit Akun — ' + u.username : 'Tambah Viewer',
+    fld('uu', 'Username *', u ? u.username : '') + (fixed ? '<div class="form-text mb-2">Username enam operator bersifat tetap dan tidak dapat diubah.</div>' : '') +
+    (u ? '' : fld('up', 'Password awal * (min. 8 karakter)', '', 'password')) +
+    fld('un', 'Nama Lengkap *', u ? u.nama_lengkap : '') + jabSel(u ? u.jabatan : 'Viewer') +
+    (fixed ? fld('ud', 'Wilayah (tetap)', u.nama_desa) : '') +
+    (u ? sel('us', 'Status', ['aktif', 'nonaktif'], u.status) : '<div class="small text-muted">Akun baru dibuat sebagai Viewer (hanya baca).</div>'),
     'Simpan', async () => {
-      const p = { mode: u ? 'edit' : 'add', user_id: id, nama_lengkap: v('un'), jabatan: v('uj'), nama_desa: $('ud') ? v('ud') : '' };
-      p.username = v('uu'); if (u) { p.status = v('us'); p.rename_riwayat = !!($('uh') && $('uh').checked); } else { p.password = $('up').value; p.role = v('ur'); }
+      const p = { mode: u ? 'edit' : 'add', user_id: id, nama_lengkap: v('un'), jabatan: v('uj'), nama_desa: fixed ? u.nama_desa : '' };
+      p.username = fixed ? u.username : v('uu');
+      if (u) p.status = v('us'); else { p.password = $('up').value; p.role = 'viewer'; }
       await api('saveUser', p); toast('Akun tersimpan'); run(vUsers);
     });
+  if (fixed) { $('uu').readOnly = true; $('ud').readOnly = true; }
 }
 
 function resetPw(id) {
   const u = S.users.find(x => x.user_id === id);
-  modal('Reset Password — ' + u.username, fld('rp', 'Password baru (min. 6 karakter)', '', 'text'), 'Reset Password', async () => {
+  modal('Reset Password — ' + u.username, fld('rp', 'Password baru (min. 8 karakter)', '', 'text'), 'Reset Password', async () => {
     await api('resetUserPassword', { user_id: id, new_password: $('rp').value }); toast('Password berhasil direset');
   });
 }
 
 // ---------- Ekspor ----------
 function exportXls() {
-  const e = S.ex, ws = XLSX.utils.aoa_to_sheet([['PEMERINTAH KABUPATEN BLORA'], [e.title], [e.sub], [], e.head, ...e.body, ...(e.foot || [])]), wb = XLSX.utils.book_new();
+  const e = S.ex; if (!e) return toast('Belum ada data untuk diekspor', 'warning');
+  const ws = XLSX.utils.aoa_to_sheet([['PEMERINTAH KABUPATEN BLORA'], [e.title], [e.sub], [], e.head, ...e.body, ...(e.foot || [])]), wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Laporan'); XLSX.writeFile(wb, e.fn + '.xlsx');
 }
 
 function exportPdf() {
-  const e = S.ex, d = new window.jspdf.jsPDF({ orientation: e.head.length > 5 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' }), W = d.internal.pageSize.getWidth();
+  const e = S.ex; if (!e) return toast('Belum ada data untuk diekspor', 'warning');
+  const d = new window.jspdf.jsPDF({ orientation: e.head.length > 5 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' }), W = d.internal.pageSize.getWidth();
   const f = r => r.map(c => typeof c === 'number' ? c.toLocaleString('id-ID') : c), cs = {};
-  (e.body[0] || e.foot[0]).forEach((c, i) => { if (typeof c === 'number') cs[i] = { halign: 'right' }; });
+  ((e.body && e.body[0]) || (e.foot && e.foot[0]) || []).forEach((c, i) => { if (typeof c === 'number') cs[i] = { halign: 'right' }; });
   d.setFont('helvetica', 'bold'); d.setFontSize(12); d.text('PEMERINTAH KABUPATEN BLORA', W / 2, 14, { align: 'center' });
   d.setFontSize(11); d.text(e.title.toUpperCase(), W / 2, 20, { align: 'center' });
   d.setFont('helvetica', 'normal'); d.setFontSize(10); d.text('Periode: ' + e.sub, W / 2, 26, { align: 'center' });

@@ -1,4 +1,4 @@
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/library/d/12mxE2rhw1Y5ZbRowUFrq9wKUzfmAYVZ0nCev_D7SfRdzh4x0ZsPV13Gt/1';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxFfQjbJWUdODl8KHQbP9kRxUi-f0jqeZZ_N3MzONjmoBEjGzKM5IQZ2n9quMb4OY_CiQ/exec';
 
 const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const WILAYAH = ['Utara', 'Selatan', 'Timur', 'Barat1', 'Barat2', 'Barat3'];

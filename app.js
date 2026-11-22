@@ -1,4 +1,4 @@
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxFfQjbJWUdODl8KHQbP9kRxUi-f0jqeZZ_N3MzONjmoBEjGzKM5IQZ2n9quMb4OY_CiQ/exec';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzhlMQKRlGRY8sPSPKfWOTzLI6dobutcBWgxiAWIddzfxC9otIh0book4D9MnvUmvMhHA/exec';
 
 const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const WILAYAH = ['Utara', 'Selatan', 'Timur', 'Barat1', 'Barat2', 'Barat3'];
@@ -367,7 +367,7 @@ async function vGroups() {
     <div><h5 class="mb-1">Master Kelompok</h5><small class="text-muted">Kelompok berada di bawah satu wilayah operator. Jumlah tiap wilayah boleh berbeda.</small></div>
     <div class="d-flex gap-2"><select id="gw" class="form-select">${WILAYAH.map(x => `<option ${x === wilayah ? 'selected' : ''}>${x}</option>`).join('')}</select><button class="btn btn-primary text-nowrap" onclick="groupForm()">+ Tambah Kelompok</button></div>
   </div>
-  ${tbl(['Urutan', 'Kode', 'Nama Kelompok', 'Status', 'Aksi'], S.groups.map(g => [g.urutan, esc(g.kode_kelompok), esc(g.nama_kelompok), `<span class="badge bg-${g.status === 'aktif' ? 'primary' : 'secondary'}">${esc(g.status)}</span>`, `<button class="btn btn-sm btn-outline-primary" onclick="groupForm('${esc(g.kelompok_id)}')">Edit</button>`]))}
+  ${tbl(['Urutan', 'Kode', 'Nama Kelompok', 'Status', 'Aksi'], S.groups.map(g => [g.urutan, esc(g.kode_kelompok), esc(g.nama_kelompok), `<span class="badge bg-${g.status === 'aktif' ? 'primary' : 'secondary'}">${esc(g.status)}</span>`, `<div class="d-flex gap-1"><button class="btn btn-sm btn-outline-primary" onclick="groupForm('${esc(g.kelompok_id)}')">Edit</button><button class="btn btn-sm btn-outline-danger" onclick="deleteGroup('${esc(g.kelompok_id)}')">Hapus</button></div>`]))}
   <p class="small text-muted">Tidak perlu membuat kelompok dengan jumlah sama di setiap wilayah. Kelompok nonaktif tetap ditampilkan pada riwayat lama, tetapi tidak muncul untuk entri baru.</p>`;
   $('gw').onchange = () => { S.gf = $('gw').value; run(vGroups); };
 }
@@ -384,6 +384,22 @@ function groupForm(id) {
       await api('saveMasterKelompok', { mode: g ? 'edit' : 'add', kelompok_id: id, nama_desa: wilayah,
         urutan: v('gno'), kode_kelompok: v('gcode'), nama_kelompok: v('gname'), status: v('gstatus') });
       toast('Kelompok berhasil disimpan'); await vGroups();
+    });
+}
+
+
+// Hapus fisik hanya diperbolehkan untuk kelompok yang belum dipakai transaksi.
+// Kelompok yang pernah digunakan harus dinonaktifkan melalui Edit.
+function deleteGroup(id) {
+  const group = (S.groups || []).find(x => x.kelompok_id === id);
+  if (!group) { toast('Kelompok tidak ditemukan. Muat ulang halaman.', 'warning'); return; }
+  modal('Hapus Kelompok',
+    `<p>Hapus kelompok <b>${esc(group.nama_kelompok)}</b> dari wilayah <b>${esc(group.nama_desa)}</b>?</p>` +
+    '<p class="small text-muted mb-0">Kelompok yang sudah memiliki riwayat transaksi tidak dapat dihapus permanen. Gunakan status Nonaktif pada menu Edit untuk menyembunyikannya dari entri baru.</p>',
+    'Ya, Hapus', async () => {
+      const result = await api('deleteMasterKelompok', {kelompok_id: id});
+      toast(result.message || 'Kelompok berhasil dihapus');
+      await vGroups();
     });
 }
 

@@ -22,15 +22,29 @@ const badge = t => t.diedit ? `<span class="badge bg-warning text-dark" title="$
 const exBtns = '<button class="btn btn-outline-danger" onclick="exportPdf()">PDF Matriks</button><button class="btn btn-outline-success" onclick="exportXls()">Excel Matriks</button>';
 const detailBtns = '<button class="btn btn-sm btn-outline-danger" onclick="exportPdf(\'detail\')">PDF Detail</button><button class="btn btn-sm btn-outline-success" onclick="exportXls(\'detail\')">Excel Detail</button>';
 const nmGroup = t => t.nama_kelompok || 'Belum dikelompokkan (data lama)';
+// Matriks yang sama digunakan Admin, Viewer, dan Operator. Filter opsional
+// mempertahankan nilai aktual (termasuk 0 yang memang diinput) serta total.
+const filteredGroupMatrix = (d, id = '') => {
+  const kelompok = id ? d.kelompok.filter(k => String(k.kelompok_id) === String(id)) : [...d.kelompok];
+  const per_kelompok = {};
+  kelompok.forEach(k => { per_kelompok[k.kelompok_id] = Number(d.ringkasan.per_kelompok[k.kelompok_id] || 0); });
+  const rows = d.rows.map(r => ({ ...r, total: kelompok.reduce((sum, k) => sum + Number(r.values[k.kelompok_id] || 0), 0) }));
+  const total = kelompok.reduce((sum, k) => sum + per_kelompok[k.kelompok_id], 0);
+  return { ...d, kelompok, rows, ringkasan: { per_kelompok, total } };
+};
+const groupChoices = (groups, current) => '<option value="">Semua kelompok (matriks lengkap)</option>' +
+  groups.map(k => `<option value="${esc(k.kelompok_id)}" ${String(k.kelompok_id) === String(current) ? 'selected' : ''}>${esc(k.nama_kelompok)}</option>`).join('');
+const hasMatrixValue = (r, id) => Object.prototype.hasOwnProperty.call(r.values || {}, id);
 const matrixExport = (d, title, f, fn, signer) => ({
   title, sub: per(f.b, f.t), head: ['Nama Rincian', ...d.kelompok.map(k => k.nama_kelompok), 'Total'],
-  body: d.rows.map(r => [r.nama_rincian, ...d.kelompok.map(k => r.values[k.kelompok_id] || 0), r.total]),
+  body: d.rows.map(r => [r.nama_rincian, ...d.kelompok.map(k => hasMatrixValue(r, k.kelompok_id) ? Number(r.values[k.kelompok_id]) : ''), r.total]),
   foot: [['Grand Total', ...d.kelompok.map(k => d.ringkasan.per_kelompok[k.kelompok_id] || 0), d.ringkasan.total]],
   signer, fn
 });
 const groupMatrixTable = d => {
+  if (!d.kelompok.length) return '<div class="alert alert-info">Belum ada kelompok untuk wilayah ini. Admin perlu menambahkan kelompok di Master Kelompok.</div>';
   const head = ['Nama Rincian', ...d.kelompok.map(g => esc(g.nama_kelompok)), 'Total'];
-  const body = d.rows.map(r => [esc(r.nama_rincian), ...d.kelompok.map(g => N(r.values[g.kelompok_id] || 0)), N(r.total)]);
+  const body = d.rows.map(r => [esc(r.nama_rincian), ...d.kelompok.map(g => hasMatrixValue(r, g.kelompok_id) ? N(r.values[g.kelompok_id]) : '<span class="d-block text-end text-muted">—</span>'), N(r.total)]);
   const foot = ['Grand Total', ...d.kelompok.map(g => N(d.ringkasan.per_kelompok[g.kelompok_id] || 0)), N(d.ringkasan.total)];
   return tbl(head, body, `<tfoot class="fw-bold table-light"><tr>${foot.map(c => `<td>${c}</td>`).join('')}</tr></tfoot>`);
 };
@@ -158,24 +172,35 @@ async function vEntry() {
     api('getEntryList', { bulan: f.b, tahun: f.t }),
     api('getRekapKelompok', { bulan: f.b, tahun: f.t })
   ]);
-  S.ex = matrixExport(matrix, 'Matriks Wilayah ' + S.user.nama_desa, f,
-    `Matriks_${S.user.nama_desa}_${f.t}-${f.b}`, d.penandatangan);
+  if (!matrix.kelompok.some(k => String(k.kelompok_id) === String(S.entryGroup))) S.entryGroup = '';
+  const groupId = S.entryGroup || '';
+  const chosen = matrix.kelompok.find(g => String(g.kelompok_id) === groupId);
+  const focus = filteredGroupMatrix(matrix, groupId);
+  const rows = groupId ? d.transaksi.filter(t => String(t.kelompok_id || '__lama__') === groupId) : d.transaksi;
+  const title = chosen ? `Kelompok ${chosen.nama_kelompok} — Wilayah ${S.user.nama_desa}` : `Seluruh Kelompok — Wilayah ${S.user.nama_desa}`;
+  const summary = { total: focus.ringkasan.total, jumlah_transaksi: rows.length };
+  S.ex = matrixExport(focus, 'Matriks ' + title, f,
+    `Matriks_${S.user.nama_desa}_${groupId || 'Semua'}_${f.t}-${f.b}`, d.penandatangan);
   S.exDetail = {
-    title: 'Laporan Detail Wilayah ' + S.user.nama_desa, sub: per(f.b, f.t),
+    title: 'Laporan Detail ' + title, sub: per(f.b, f.t),
     head: ['Periode', 'Kelompok', 'Rincian', 'Nominal'],
-    body: d.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, nmGroup(t), t.nama_rincian, t.nominal]),
-    foot: [['', '', 'Grand Total', d.total]], signer: d.penandatangan,
-    fn: `Detail_${S.user.nama_desa}_${f.t}-${f.b}`
+    body: rows.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, nmGroup(t), t.nama_rincian, t.nominal]),
+    foot: [['', '', 'Grand Total', summary.total]], signer: d.penandatangan,
+    fn: `Detail_${S.user.nama_desa}_${groupId || 'Semua'}_${f.t}-${f.b}`
   };
-  $('view').innerHTML = `<div class="row g-2 mb-3">
-    <div class="col-6 col-md-2"><select id="fb" class="form-select">${optBln(f.b, 1)}</select></div>
-    <div class="col-6 col-md-2"><select id="ft" class="form-select">${optThn(f.t)}</select></div>
-    <div class="col-md-8 d-flex flex-wrap gap-2 justify-content-md-end"><button class="btn btn-primary" onclick="S.fm=null;run(entryForm)">+ Input Laporan Bulanan</button>${exBtns}</div>
-  </div>${cards(d)}
-  <h6>Rekap per Kelompok</h6>${groupMatrixTable(matrix)}
+  $('view').innerHTML = `<div class="row g-2 mb-3 align-items-end">
+    <div class="col-6 col-md-2"><label class="form-label small mb-1" for="fb">Bulan</label><select id="fb" class="form-select">${optBln(f.b, 1)}</select></div>
+    <div class="col-6 col-md-2"><label class="form-label small mb-1" for="ft">Tahun</label><select id="ft" class="form-select">${optThn(f.t)}</select></div>
+    <div class="col-md-3"><label class="form-label small mb-1" for="eg">Lihat kelompok</label><select id="eg" class="form-select">${groupChoices(matrix.kelompok, groupId)}</select></div>
+    <div class="col-md-5 d-flex flex-wrap gap-2 justify-content-md-end"><button class="btn btn-primary" onclick="S.fm=null;run(entryForm)">+ Input Laporan Bulanan</button>${exBtns}</div>
+  </div>
+  <div class="small text-muted mb-2">Ringkasan ${esc(title)}</div>${cards(summary)}
+  <h6>Rincian per Kelompok — ${esc(S.user.nama_desa)}</h6>
+  <p class="small text-muted">Baris = indikator/rincian. Kolom = nama kelompok. Kolom terakhir = total. Tanda — berarti belum ada nilai yang diinput (berbeda dari Rp 0).</p>
+  ${groupMatrixTable(focus)}
   <div class="d-flex justify-content-between align-items-center mt-4 mb-2"><h6 class="mb-0">Riwayat Nilai Terisi</h6><div class="d-flex gap-2">${detailBtns}</div></div>
-  ${tbl(['Periode', 'Kelompok', 'Rincian', 'Nominal'], d.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(nmGroup(t)), esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal)]))}`;
-  bind(['fb', 'ft'], () => { f.b = +$('fb').value; f.t = +$('ft').value; run(vEntry); });
+  ${tbl(['Periode', 'Kelompok', 'Rincian', 'Nominal'], rows.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(nmGroup(t)), esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal)]))}`;
+  bind(['fb', 'ft', 'eg'], () => { f.b = +$('fb').value; f.t = +$('ft').value; S.entryGroup = $('eg').value; run(vEntry); });
 }
 
 function sigPad() {
@@ -278,13 +303,13 @@ function updateMatrixTotals() {
 
 // ---------- 3. Rekap (Admin & Viewer) ----------
 async function vRekap() {
-  const n = now(), f = S.rf || (S.rf = { m: 'mx', b: n.b, t: n.t, d: '' });
+  const n = now(), f = S.rf || (S.rf = { m: 'mx', b: n.b, t: n.t, d: '', g: '' });
   const adm = S.user.role === 'admin_kabupaten';
   if (adm && !S.master.length) S.master = (await api('getMasterRincian')).rincian;
   S.exDetail = null;
-  let mx = null;
+  let mx = null, groupOptions = '';
   if (f.m === 'mx' || !S.desa.length) { mx = await api('getRekapMatriks', { bulan: f.b, tahun: f.t }); S.desa = mx.desa; }
-  if (!S.desa.includes(f.d)) f.d = S.desa[0] || '';
+  if (!S.desa.includes(f.d)) { f.d = S.desa[0] || ''; f.g = ''; }
   let inner = '<div class="text-muted">Belum ada wilayah.</div>';
   if (f.m === 'mx') {
     const D = mx.desa, R = mx.ringkasan;
@@ -293,36 +318,55 @@ async function vRekap() {
     S.ex = { title: 'Rekap Keuangan Seluruh Wilayah', sub: per(f.b, f.t), head,
       body: mx.rows.map(r => [r.nama_rincian, ...D.map(x => r.values[x] || 0), r.total]), foot: [grand],
       signer: { nama: S.user.nama_lengkap, jabatan: S.user.jabatan, ttd_data: '' }, fn: `Rekap_${f.t}-${f.b}` };
-    inner = tbl(head.map(esc), mx.rows.map(r => [esc(r.nama_rincian), ...D.map(x => N(r.values[x] || 0)), N(r.total)]),
+    inner = `<h6>Matriks Seluruh Wilayah</h6>` + tbl(head.map(esc), mx.rows.map(r => [esc(r.nama_rincian), ...D.map(x => N(r.values[x] || 0)), N(r.total)]),
       `<tfoot class="fw-bold"><tr>${grand.map((c, i) => `<td>${i ? N(c) : c}</td>`).join('')}</tr></tfoot>`);
   } else if (f.d) {
     const [p, g] = await Promise.all([
       api('getRekapPerDesa', { nama_desa: f.d, bulan: f.b, tahun: f.t }),
       api('getRekapKelompok', { nama_desa: f.d, bulan: f.b, tahun: f.t })
     ]);
-    S.pd = p.transaksi;
+    if (!g.kelompok.some(k => String(k.kelompok_id) === String(f.g))) f.g = '';
+    groupOptions = groupChoices(g.kelompok, f.g);
+    const chosen = g.kelompok.find(k => String(k.kelompok_id) === String(f.g));
+    const focus = filteredGroupMatrix(g, f.g);
+    const rows = f.g ? p.transaksi.filter(t => String(t.kelompok_id || '__lama__') === String(f.g)) : p.transaksi;
+    const title = chosen ? `Kelompok ${chosen.nama_kelompok} — Wilayah ${f.d}` : `Seluruh Kelompok — Wilayah ${f.d}`;
+    S.pd = p.transaksi; // Simpan daftar lengkap untuk validasi Edit Admin.
     S.rekapGroups = g.kelompok.filter(x => x.kelompok_id !== '__lama__');
-    S.ex = matrixExport(g, 'Matriks Kelompok Wilayah ' + f.d, f,
-      `Matriks_${f.d}_${f.t}-${f.b}`, p.penandatangan);
+    S.ex = matrixExport(focus, 'Matriks ' + title, f,
+      `Matriks_${f.d}_${f.g || 'Semua'}_${f.t}-${f.b}`, p.penandatangan);
     S.exDetail = {
-      title: 'Laporan Detail Wilayah ' + f.d, sub: per(f.b, f.t),
+      title: 'Laporan Detail ' + title, sub: per(f.b, f.t),
       head: ['Periode', 'Kelompok', 'Rincian', 'Nominal', 'Waktu Input'],
-      body: p.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, nmGroup(t), t.nama_rincian, t.nominal, t.timestamp_input]),
-      foot: [['', '', 'Grand Total', p.total, '']], signer: p.penandatangan, fn: `Detail_${f.d}_${f.t}-${f.b}`
+      body: rows.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, nmGroup(t), t.nama_rincian, t.nominal, t.timestamp_input]),
+      foot: [['', '', 'Grand Total', focus.ringkasan.total, '']], signer: p.penandatangan,
+      fn: `Detail_${f.d}_${f.g || 'Semua'}_${f.t}-${f.b}`
     };
-    inner = `<h6>Rekap per Kelompok — ${esc(f.d)}</h6>${groupMatrixTable(g)}
+    inner = `<h6>Rincian per Kelompok — ${esc(f.d)}</h6>
+      <p class="small text-muted">Baris = indikator/rincian; kolom = nama kelompok di wilayah ${esc(f.d)}. Tanda — menunjukkan belum ada nilai yang diinput.</p>
+      ${groupMatrixTable(focus)}
       <div class="d-flex justify-content-between align-items-center mt-4 mb-2"><h6 class="mb-0">Detail Nilai Terisi</h6><div class="d-flex flex-wrap gap-2">${detailBtns}</div></div>
       ${tbl(['Periode', 'Kelompok', 'Rincian', 'Nominal', 'Waktu Input', ...(adm ? ['Aksi'] : [])],
-        p.transaksi.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(nmGroup(t)), esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal), `<small>${esc(t.timestamp_input)}</small>`,
+        rows.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(nmGroup(t)), esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal), `<small>${esc(t.timestamp_input)}</small>`,
           ...(adm ? [`<button class="btn btn-sm btn-outline-primary" onclick="editTrx('${esc(t.trx_id)}')">Edit</button>`] : [])]),
-        `<tfoot class="fw-bold"><tr><td colspan="3" class="text-end">Grand Total</td><td>${N(p.total)}</td><td colspan="${adm ? 2 : 1}"></td></tr></tfoot>`)}`;
+        `<tfoot class="fw-bold"><tr><td colspan="3" class="text-end">Grand Total</td><td>${N(focus.ringkasan.total)}</td><td colspan="${adm ? 2 : 1}"></td></tr></tfoot>`)}`;
   }
-  $('view').innerHTML = `<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+  $('view').innerHTML = `<div class="d-flex flex-wrap gap-2 mb-3 align-items-end">
     <div class="btn-group"><button class="btn btn-${f.m === 'mx' ? 'primary' : 'outline-primary'}" onclick="S.rf.m='mx';run(vRekap)">Matriks Gabungan</button><button class="btn btn-${f.m === 'ds' ? 'primary' : 'outline-primary'}" onclick="S.rf.m='ds';run(vRekap)">Per Wilayah</button></div>
-    <select id="fb" class="form-select w-auto">${optBln(f.b, 1)}</select><select id="ft" class="form-select w-auto">${optThn(f.t)}</select>
-    ${f.m === 'ds' ? `<select id="fd" class="form-select w-auto">${S.desa.map(x => `<option ${x == f.d ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>` : ''}
-    <span class="ms-auto d-flex gap-2">${exBtns}</span></div>${inner}`;
-  bind(['fb', 'ft', 'fd'], () => { f.b = +$('fb').value; f.t = +$('ft').value; if ($('fd')) f.d = $('fd').value; run(vRekap); });
+    <div><label class="form-label small mb-1" for="fb">Bulan</label><select id="fb" class="form-select">${optBln(f.b, 1)}</select></div>
+    <div><label class="form-label small mb-1" for="ft">Tahun</label><select id="ft" class="form-select">${optThn(f.t)}</select></div>
+    ${f.m === 'ds' ? `<div><label class="form-label small mb-1" for="fd">Wilayah</label><select id="fd" class="form-select">${S.desa.map(x => `<option ${x == f.d ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+    <div><label class="form-label small mb-1" for="fg">Lihat kelompok</label><select id="fg" class="form-select">${groupOptions}</select></div>` : ''}
+    <span class="ms-auto d-flex flex-wrap gap-2">${exBtns}</span></div>${inner}`;
+  bind(['fb', 'ft', 'fd', 'fg'], () => {
+    f.b = +$('fb').value; f.t = +$('ft').value;
+    if ($('fd')) {
+      const nextRegion = $('fd').value;
+      if (nextRegion !== f.d) { f.d = nextRegion; f.g = ''; }
+      else if ($('fg')) f.g = $('fg').value;
+    }
+    run(vRekap);
+  });
 }
 
 function editTrx(id) {
@@ -470,3 +514,4 @@ $('burger').onclick = () => document.body.classList.toggle(innerWidth < 992 ? 'o
 $('scrim').onclick = () => document.body.classList.remove('open');
 
 start();
+

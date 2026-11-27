@@ -1,4 +1,4 @@
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzhlMQKRlGRY8sPSPKfWOTzLI6dobutcBWgxiAWIddzfxC9otIh0book4D9MnvUmvMhHA/exec';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwtXDfPXHqxXqqTXcxQy2VZ9TN-KXiQvLKCa6JaSasqTEMkNsFY_lg1IEMzkfP1D5kImg/exec';
 
 const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const WILAYAH = ['Utara', 'Selatan', 'Timur', 'Barat1', 'Barat2', 'Barat3'];
@@ -18,7 +18,7 @@ const fld = (id, l, val = '', type = 'text') => `<div class="mb-2"><label class=
 const sel = (id, l, opts, cur) => `<div class="mb-2"><label class="form-label small mb-1">${l}</label><select id="${id}" class="form-select">${opts.map(o => `<option ${o == cur ? 'selected' : ''}>${o}</option>`).join('')}</select></div>`;
 const tbl = (h, r, foot = '') => `<div class="table-responsive"><table class="table table-sm table-striped align-middle bg-white"><thead class="table-light"><tr>${h.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${r.length ? r.map(x => `<tr>${x.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${h.length}" class="text-center text-muted py-3">Belum ada data</td></tr>`}</tbody>${foot}</table></div>`;
 const cards = d => `<div class="row g-3 mb-3"><div class="col-md-6"><div class="card border-primary"><div class="card-body py-3"><div class="text-muted small">Total Nominal</div><div class="fs-4 fw-bold text-primary">${rp(d.total)}</div></div></div></div><div class="col-md-6"><div class="card"><div class="card-body py-3"><div class="text-muted small">Jumlah Nilai Terisi</div><div class="fs-4 fw-bold">${Number(d.jumlah_transaksi || 0).toLocaleString('id-ID')}</div></div></div></div></div>`;
-const badge = t => t.diedit ? `<span class="badge bg-warning text-dark" title="${esc(t.edit_message)} — ${esc(t.edited_by)}, ${esc(t.edited_at)}" onclick="alert(this.title)">Diedit Admin</span>` : '';
+const badge = t => t.diedit ? `<span class="badge bg-warning text-dark" title="${esc(t.edit_message)} — ${esc(t.edited_by)}, ${esc(t.edited_at)}" onclick="alert(this.title)">Diedit</span>` : '';
 const exBtns = '<button class="btn btn-outline-danger" onclick="exportPdf()">PDF Matriks</button><button class="btn btn-outline-success" onclick="exportXls()">Excel Matriks</button>';
 const detailBtns = '<button class="btn btn-sm btn-outline-danger" onclick="exportPdf(\'detail\')">PDF Detail</button><button class="btn btn-sm btn-outline-success" onclick="exportXls(\'detail\')">Excel Detail</button>';
 const nmGroup = t => t.nama_kelompok || 'Belum dikelompokkan (data lama)';
@@ -177,6 +177,7 @@ async function vEntry() {
   const chosen = matrix.kelompok.find(g => String(g.kelompok_id) === groupId);
   const focus = filteredGroupMatrix(matrix, groupId);
   const rows = groupId ? d.transaksi.filter(t => String(t.kelompok_id || '__lama__') === groupId) : d.transaksi;
+  S.entryTransactions = d.transaksi;
   const title = chosen ? `Kelompok ${chosen.nama_kelompok} — Wilayah ${S.user.nama_desa}` : `Seluruh Kelompok — Wilayah ${S.user.nama_desa}`;
   const summary = { total: focus.ringkasan.total, jumlah_transaksi: rows.length };
   S.ex = matrixExport(focus, 'Matriks ' + title, f,
@@ -199,7 +200,8 @@ async function vEntry() {
   <p class="small text-muted">Baris = indikator/rincian. Kolom = nama kelompok. Kolom terakhir = total. Tanda — berarti belum ada nilai yang diinput (berbeda dari Rp 0).</p>
   ${groupMatrixTable(focus)}
   <div class="d-flex justify-content-between align-items-center mt-4 mb-2"><h6 class="mb-0">Riwayat Nilai Terisi</h6><div class="d-flex gap-2">${detailBtns}</div></div>
-  ${tbl(['Periode', 'Kelompok', 'Rincian', 'Nominal'], rows.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(nmGroup(t)), esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal)]))}`;
+  <p class="small text-muted">Koreksi nominal dapat dilakukan pada bulan berjalan dan satu bulan sebelumnya. Periode lebih lama hanya dapat dikoreksi Admin.</p>
+  ${tbl(['Periode', 'Kelompok', 'Rincian', 'Nominal', 'Aksi'], rows.map(t => [BLN[t.bulan - 1] + ' ' + t.tahun, esc(nmGroup(t)), esc(t.nama_rincian) + ' ' + badge(t), N(t.nominal), t.boleh_edit ? `<button class="btn btn-sm btn-outline-primary" onclick="editOwnTrx('${esc(t.trx_id)}')">Edit</button>` : '<span class="text-muted small">Terkunci</span>']))}`;
   bind(['fb', 'ft', 'eg'], () => { f.b = +$('fb').value; f.t = +$('ft').value; S.entryGroup = $('eg').value; run(vEntry); });
 }
 
@@ -250,7 +252,7 @@ async function entryForm() {
       <div class="col-6 col-md-3"><label class="form-label small mb-1">Tahun</label><select id="pt" class="form-select">${optThn(f.t)}</select></div>
       <div class="col-md-6"><label class="form-label small mb-1">Tanggal &amp; Waktu Input</label><div id="clk" class="fw-semibold pt-1"></div></div>
     </div>
-    ${ex ? `<div class="alert alert-info">Laporan <b>${per(f.b, f.t)}</b> sudah pernah tersimpan${sg ? ' pada ' + esc(sg.timestamp_input) : ''}. Hanya untuk dilihat. Koreksi melalui Admin Kabupaten.</div>` : `<p class="text-muted small">Isi nominal untuk setiap kelompok pada indikator yang sesuai. Kotak kosong tidak disimpan, angka <b>0</b> dihitung sebagai nilai terisi. <b>Setiap kelompok wajib memiliki setidaknya satu nominal terisi.</b> Geser tabel ke samping pada HP.</p>`}
+    ${ex ? `<div class="alert alert-info">Laporan <b>${per(f.b, f.t)}</b> sudah pernah tersimpan${sg ? ' pada ' + esc(sg.timestamp_input) : ''}. Untuk koreksi nominal, kembali ke Riwayat Nilai Terisi pada menu Entry. Jika periode terkunci, hubungi Admin Kabupaten.</div>` : `<p class="text-muted small">Isi nominal untuk setiap kelompok pada indikator yang sesuai. Kotak kosong tidak disimpan, angka <b>0</b> dihitung sebagai nilai terisi. <b>Setiap kelompok wajib memiliki setidaknya satu nominal terisi.</b> Geser tabel ke samping pada HP.</p>`}
     ${table}
     ${ex ? `<p class="mt-3 mb-0 small">Penandatangan: <b>${esc(sg && sg.nama)}</b> (${esc(sg && sg.jabatan)})</p>` : `
       <h6 class="mt-4">Penandatangan</h6>
@@ -367,6 +369,22 @@ async function vRekap() {
     }
     run(vRekap);
   });
+}
+
+function editOwnTrx(id) {
+  const t = (S.entryTransactions || []).find(x => x.trx_id === id);
+  if (!t || !t.boleh_edit) return toast('Transaksi tidak dapat diedit', 'warning');
+  modal('Koreksi Nominal — ' + t.nama_desa,
+    `<p class="small">${esc(per(t.bulan, t.tahun))} — ${esc(nmGroup(t))}<br>${esc(t.nama_rincian)}</p>
+     <div class="mb-2"><label class="form-label">Nominal</label><input id="en" class="form-control money text-end" inputmode="numeric" value="${Number(t.nominal).toLocaleString('id-ID')}"></div>
+     <div class="mb-2"><label class="form-label">Alasan perubahan *</label><textarea id="em" class="form-control" rows="3" maxlength="300" required></textarea></div>`,
+    'Simpan Perubahan', async () => {
+      if (!v('em')) throw new Error('Alasan perubahan wajib diisi.');
+      const nominal = v('en').replace(/\D/g, '');
+      if (!nominal) throw new Error('Nominal wajib diisi.');
+      await api('updateTransaksiOperator', {trx_id: id, rincian_id: t.rincian_id, kelompok_id: t.kelompok_id || '', nominal, edit_message: v('em')});
+      toast('Perubahan tersimpan'); run(vEntry);
+    });
 }
 
 function editTrx(id) {
@@ -514,4 +532,3 @@ $('burger').onclick = () => document.body.classList.toggle(innerWidth < 992 ? 'o
 $('scrim').onclick = () => document.body.classList.remove('open');
 
 start();
-
